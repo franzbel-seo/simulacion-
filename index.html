@@ -6,221 +6,219 @@
     <title>Document</title>
 </head>
 <body>
-    <div id="chatgpt-wrapper"></div>
+<div id="chatgpt-wrapper"></div>
 <script>
-// Crear estilos dentro del wrapper
+// Estilos inyectados dinámicamente
 (function () {
-  const style = document.createElement("style");
-  style.textContent = `
-    #chatgpt-wrapper {
-      width: 100%;
-      height: 100vh;
-      overflow: hidden;
-      position: relative;
-      background-color: black;
-      touch-action: none;
-    }
-    .chatgpt-planet-label {
-      position: absolute;
-      color: white;
-      font-size: 12px;
-      pointer-events: none;
-    }
-    .chatgpt-modal {
-      position: absolute;
-      background: rgba(0,0,0,0.8);
-      color: white;
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 12px;
-      display: none;
-      z-index: 10;
-      max-width: 200px;
-    }
-    .chatgpt-controls {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(255,255,255,0.1);
-      padding: 10px;
-      border-radius: 8px;
-      color: white;
-      font-size: 12px;
-      z-index: 20;
-    }
-    .chatgpt-controls button, .chatgpt-controls input {
-      display: block;
-      margin: 5px 0;
-      width: 100%;
-    }
-  `;
-  document.getElementById("chatgpt-wrapper").appendChild(style);
+    const style = document.createElement("style");
+    style.innerHTML = `
+        #chatgpt-wrapper {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+            background-color: black;
+        }
+        .chatgpt-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 10;
+        }
+        .chatgpt-panel button, .chatgpt-panel input {
+            display: block;
+            margin: 5px 0;
+            width: 100%;
+        }
+        .chatgpt-label {
+            color: white;
+            position: absolute;
+            font-size: 12px;
+            text-shadow: 1px 1px 2px black;
+        }
+        .chatgpt-orbit {
+            stroke: white;
+            stroke-width: 1px;
+            stroke-dasharray: 4;
+            fill: none;
+        }
+        .chatgpt-modal {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            z-index: 20;
+        }
+    `;
+    document.head.appendChild(style);
 })();
 
-// Configuración inicial
 (function () {
-  const wrapper = document.getElementById("chatgpt-wrapper");
-  const canvas = document.createElement("canvas");
-  canvas.width = wrapper.clientWidth;
-  canvas.height = wrapper.clientHeight;
-  wrapper.appendChild(canvas);
-  const ctx = canvas.getContext("2d");
+    const data = [
+        { name: 'Mercurio', color: '#a9a9a9', radius: 4, distance: 50, speed: 0.4, info: 'Masa: 3.3×10^23 kg\nDiámetro: 4879 km\nGravedad: 3.7 m/s²\nTemp: 167°C' },
+        { name: 'Venus', color: '#e5c07b', radius: 6, distance: 70, speed: 0.3, info: 'Masa: 4.87×10^24 kg\nDiámetro: 12104 km\nGravedad: 8.87 m/s²\nTemp: 464°C' },
+        { name: 'Tierra', color: '#4fc3f7', radius: 6, distance: 90, speed: 0.2, info: 'Masa: 5.97×10^24 kg\nDiámetro: 12742 km\nGravedad: 9.8 m/s²\nTemp: 15°C' },
+        { name: 'Marte', color: '#f44336', radius: 5, distance: 110, speed: 0.15, info: 'Masa: 6.42×10^23 kg\nDiámetro: 6779 km\nGravedad: 3.71 m/s²\nTemp: -63°C' },
+        { name: 'Júpiter', color: '#ffb74d', radius: 10, distance: 140, speed: 0.1, info: 'Masa: 1.9×10^27 kg\nDiámetro: 139820 km\nGravedad: 24.79 m/s²\nTemp: -145°C' },
+        { name: 'Saturno', color: '#fdd835', radius: 9, distance: 170, speed: 0.09, ring: { width: 20, color: '#f5deb3' }, info: 'Masa: 5.68×10^26 kg\nDiámetro: 116460 km\nGravedad: 10.44 m/s²\nTemp: -178°C' },
+        { name: 'Urano', color: '#81d4fa', radius: 7, distance: 200, speed: 0.07, ring: { width: 10, color: '#aaa' }, info: 'Masa: 8.68×10^25 kg\nDiámetro: 50724 km\nGravedad: 8.69 m/s²\nTemp: -224°C' },
+        { name: 'Neptuno', color: '#1565c0', radius: 7, distance: 230, speed: 0.05, info: 'Masa: 1.02×10^26 kg\nDiámetro: 49244 km\nGravedad: 11.15 m/s²\nTemp: -214°C' }
+    ];
 
-  let scale = 1, offsetX = 0, offsetY = 0;
-  let dragging = false, paused = false;
-  let showLabels = true, showOrbits = true;
-  let dragStart = {};
-  let speedMultiplier = 1;
+    const wrapper = document.getElementById('chatgpt-wrapper');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    wrapper.appendChild(canvas);
 
-  const modal = document.createElement("div");
-  modal.className = "chatgpt-modal";
-  wrapper.appendChild(modal);
+    const modal = document.createElement('div');
+    modal.className = 'chatgpt-modal';
+    wrapper.appendChild(modal);
 
-  const controls = document.createElement("div");
-  controls.className = "chatgpt-controls";
-  controls.innerHTML = `
-    <button id="chatgpt-toggle">⏸ Pausar</button>
-    <button id="chatgpt-labels">🔤 Ocultar nombres</button>
-    <button id="chatgpt-orbits">⭕ Ocultar órbitas</button>
-    <label>Velocidad <input id="chatgpt-speed" type="range" min="0.1" max="5" step="0.1" value="1"></label>
-  `;
-  wrapper.appendChild(controls);
+    const panel = document.createElement('div');
+    panel.className = 'chatgpt-panel';
+    panel.innerHTML = `
+        <button id="chatgpt-toggle">Pausar</button>
+        <button id="chatgpt-names">Ocultar Nombres</button>
+        <button id="chatgpt-orbits">Ocultar Órbitas</button>
+        <label>Velocidad <input type="range" id="chatgpt-speed" min="0.1" max="5" value="1" step="0.1"></label>
+    `;
+    wrapper.appendChild(panel);
 
-  document.getElementById("chatgpt-toggle").onclick = () => {
-    paused = !paused;
-    document.getElementById("chatgpt-toggle").textContent = paused ? "▶ Reanudar" : "⏸ Pausar";
-  };
-  document.getElementById("chatgpt-labels").onclick = () => {
-    showLabels = !showLabels;
-    document.getElementById("chatgpt-labels").textContent = showLabels ? "🔤 Ocultar nombres" : "🔤 Mostrar nombres";
-  };
-  document.getElementById("chatgpt-orbits").onclick = () => {
-    showOrbits = !showOrbits;
-    document.getElementById("chatgpt-orbits").textContent = showOrbits ? "⭕ Ocultar órbitas" : "⭕ Mostrar órbitas";
-  };
-  document.getElementById("chatgpt-speed").oninput = (e) => speedMultiplier = parseFloat(e.target.value);
+    let width, height;
+    function resize() {
+        width = wrapper.clientWidth;
+        height = wrapper.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
-  const planets = [
-    { name: "Mercurio", color: "#b1b1b1", r: 3, dist: 30, speed: 0.04, angle: 0, info: "Masa: 3.3e23 kg\nDiámetro: 4879 km\nGravedad: 3.7 m/s²\nTemp: 167°C" },
-    { name: "Venus", color: "#eccc9a", r: 4, dist: 50, speed: 0.015, angle: 0, info: "Masa: 4.87e24 kg\nDiámetro: 12104 km\nGravedad: 8.87 m/s²\nTemp: 464°C" },
-    { name: "Tierra", color: "#3fa9f5", r: 5, dist: 70, speed: 0.01, angle: 0, info: "Masa: 5.97e24 kg\nDiámetro: 12742 km\nGravedad: 9.8 m/s²\nTemp: 15°C" },
-    { name: "Marte", color: "#b22222", r: 4, dist: 90, speed: 0.008, angle: 0, info: "Masa: 6.42e23 kg\nDiámetro: 6779 km\nGravedad: 3.71 m/s²\nTemp: -65°C" },
-    { name: "Júpiter", color: "#d2b48c", r: 8, dist: 120, speed: 0.005, angle: 0, info: "Masa: 1.9e27 kg\nDiámetro: 139822 km\nGravedad: 24.8 m/s²\nTemp: -110°C" },
-    { name: "Saturno", color: "#f5deb3", r: 7, dist: 150, speed: 0.003, angle: 0, ring: true, info: "Masa: 5.68e26 kg\nDiámetro: 116464 km\nGravedad: 10.44 m/s²\nTemp: -140°C" },
-    { name: "Urano", color: "#afeeee", r: 6, dist: 180, speed: 0.002, angle: 0, ring: true, info: "Masa: 8.68e25 kg\nDiámetro: 50724 km\nGravedad: 8.87 m/s²\nTemp: -195°C" },
-    { name: "Neptuno", color: "#4169e1", r: 6, dist: 210, speed: 0.001, angle: 0, info: "Masa: 1.02e26 kg\nDiámetro: 49244 km\nGravedad: 11.15 m/s²\nTemp: -200°C" },
-  ];
+    let time = 0, running = true, showNames = true, showOrbits = true, speed = 1;
+    const labels = [];
+    const center = { x: width / 2, y: height / 2 };
+    let scale = 1;
+    let offset = { x: 0, y: 0 };
+    let dragging = false;
+    let dragStart = { x: 0, y: 0 };
 
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const cx = canvas.width / 2 + offsetX;
-    const cy = canvas.height / 2 + offsetY;
+    wrapper.addEventListener('wheel', e => {
+        scale += e.deltaY * -0.001;
+        scale = Math.min(Math.max(0.5, scale), 5);
+    });
 
-    // Sol
-    ctx.beginPath();
-    ctx.arc(cx, cy, 10 * scale, 0, 2 * Math.PI);
-    ctx.fillStyle = "yellow";
-    ctx.fill();
-
-    for (const p of planets) {
-      const orbitX = cx + Math.cos(p.angle) * p.dist * scale;
-      const orbitY = cy + Math.sin(p.angle) * p.dist * scale;
-
-      if (showOrbits) {
-        ctx.beginPath();
-        ctx.setLineDash([2, 3]);
-        ctx.strokeStyle = "#555";
-        ctx.arc(cx, cy, p.dist * scale, 0, 2 * Math.PI);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      if (p.ring) {
-        ctx.beginPath();
-        ctx.ellipse(orbitX, orbitY, p.r * scale * 2, p.r * scale * 0.5, 0, 0, 2 * Math.PI);
-        ctx.strokeStyle = p.name === "Saturno" ? "#f5deb3" : "#aaa";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      ctx.beginPath();
-      ctx.arc(orbitX, orbitY, p.r * scale, 0, 2 * Math.PI);
-      ctx.fillStyle = p.color;
-      ctx.fill();
-
-      if (showLabels) {
-        let label = document.getElementById("chatgpt-label-" + p.name);
-        if (!label) {
-          label = document.createElement("div");
-          label.id = "chatgpt-label-" + p.name;
-          label.className = "chatgpt-planet-label";
-          label.textContent = p.name;
-          wrapper.appendChild(label);
+    wrapper.addEventListener('mousedown', e => {
+        dragging = true;
+        dragStart = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+    });
+    window.addEventListener('mouseup', () => dragging = false);
+    window.addEventListener('mousemove', e => {
+        if (dragging) {
+            offset.x = e.clientX - dragStart.x;
+            offset.y = e.clientY - dragStart.y;
         }
-        label.style.left = orbitX + 5 + "px";
-        label.style.top = orbitY + 5 + "px";
-      }
+    });
 
-      p.screenX = orbitX;
-      p.screenY = orbitY;
-    }
-  }
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+        const cx = center.x + offset.x;
+        const cy = center.y + offset.y;
 
-  canvas.addEventListener("mousemove", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    let found = false;
-    for (const p of planets) {
-      const dx = mx - p.screenX;
-      const dy = my - p.screenY;
-      if (Math.sqrt(dx * dx + dy * dy) < p.r * scale + 4) {
-        modal.style.left = e.clientX + 10 + "px";
-        modal.style.top = e.clientY + 10 + "px";
-        modal.style.display = "block";
-        modal.textContent = `${p.name}\n${p.info}`;
-        found = true;
-        break;
-      }
-    }
-    if (!found) modal.style.display = "none";
-  });
+        // Sun
+        ctx.beginPath();
+        ctx.arc(cx, cy, 15 * scale, 0, Math.PI * 2);
+        ctx.fillStyle = 'yellow';
+        ctx.fill();
 
-  canvas.addEventListener("mousedown", (e) => {
-    dragging = true;
-    dragStart.x = e.clientX;
-    dragStart.y = e.clientY;
-  });
-  window.addEventListener("mouseup", () => dragging = false);
-  window.addEventListener("mousemove", (e) => {
-    if (dragging) {
-      offsetX += (e.clientX - dragStart.x);
-      offsetY += (e.clientY - dragStart.y);
-      dragStart.x = e.clientX;
-      dragStart.y = e.clientY;
-    }
-  });
-  canvas.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    scale += e.deltaY > 0 ? -0.05 : 0.05;
-    scale = Math.max(0.1, Math.min(5, scale));
-  });
+        labels.forEach(l => l.remove());
+        labels.length = 0;
 
-  function animate() {
-    if (!paused) {
-      for (const p of planets) p.angle += p.speed * speedMultiplier;
+        data.forEach((planet, i) => {
+            const angle = time * planet.speed * speed;
+            const x = cx + planet.distance * scale * Math.cos(angle);
+            const y = cy + planet.distance * scale * Math.sin(angle);
+
+            // Orbit
+            if (showOrbits) {
+                ctx.beginPath();
+                ctx.setLineDash([4, 4]);
+                ctx.ellipse(cx, cy, planet.distance * scale, planet.distance * scale, 0, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'white';
+                ctx.stroke();
+            }
+
+            // Rings
+            if (planet.ring) {
+                ctx.beginPath();
+                ctx.ellipse(x, y, (planet.radius + planet.ring.width) * scale, (planet.radius + 2) * scale, 0, 0, 2 * Math.PI);
+                ctx.strokeStyle = planet.ring.color;
+                ctx.setLineDash([]);
+                ctx.stroke();
+            }
+
+            // Planet
+            ctx.beginPath();
+            ctx.arc(x, y, planet.radius * scale, 0, Math.PI * 2);
+            ctx.fillStyle = planet.color;
+            ctx.fill();
+
+            // Label
+            if (showNames) {
+                const label = document.createElement('div');
+                label.className = 'chatgpt-label';
+                label.innerText = planet.name;
+                label.style.left = `${x + 10}px`;
+                label.style.top = `${y}px`;
+                wrapper.appendChild(label);
+                labels.push(label);
+            }
+
+            // Mouseover
+            canvas.addEventListener('mousemove', e => {
+                const dx = x - e.offsetX;
+                const dy = y - e.offsetY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < planet.radius * scale + 3) {
+                    modal.style.display = 'block';
+                    modal.style.left = `${e.offsetX + 15}px`;
+                    modal.style.top = `${e.offsetY + 15}px`;
+                    modal.innerText = `${planet.name}\n${planet.info}`;
+                }
+            });
+            canvas.addEventListener('mouseleave', () => {
+                modal.style.display = 'none';
+            });
+        });
+
+        if (running) time += 0.01 * speed;
+        requestAnimationFrame(draw);
     }
     draw();
-    requestAnimationFrame(animate);
-  }
 
-  window.addEventListener("resize", () => {
-    canvas.width = wrapper.clientWidth;
-    canvas.height = wrapper.clientHeight;
-  });
-
-  animate();
+    document.getElementById('chatgpt-toggle').onclick = () => {
+        running = !running;
+        document.getElementById('chatgpt-toggle').innerText = running ? 'Pausar' : 'Reanudar';
+    };
+    document.getElementById('chatgpt-names').onclick = () => {
+        showNames = !showNames;
+        document.getElementById('chatgpt-names').innerText = showNames ? 'Ocultar Nombres' : 'Mostrar Nombres';
+    };
+    document.getElementById('chatgpt-orbits').onclick = () => {
+        showOrbits = !showOrbits;
+        document.getElementById('chatgpt-orbits').innerText = showOrbits ? 'Ocultar Órbitas' : 'Mostrar Órbitas';
+    };
+    document.getElementById('chatgpt-speed').oninput = e => {
+        speed = parseFloat(e.target.value);
+    };
 })();
 </script>
+
 </body>
 </html>
